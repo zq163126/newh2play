@@ -31,7 +31,6 @@ class BrowserManager:
             "--no-sandbox",
             "--disable-blink-features=AutomationControlled",
         ]
-        # 恢复插件加载
         if nopecha_enabled:
             launch_args += [
                 f"--disable-extensions-except={NOPECHA_EXTENSION_PATH}",
@@ -52,7 +51,6 @@ class BrowserManager:
             proxy=proxy_config,
         )
 
-        # 注入反检测脚本
         self.context.add_init_script("""
             Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
             window.navigator.chrome = {runtime: {}};
@@ -72,6 +70,6 @@ class BrowserManager:
         page = self.context.new_page()
         try:
             page.goto(f"https://nopecha.com/setup#{api_key}", wait_until="load", timeout=10_000)
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(2000)
         finally:
             page.close()

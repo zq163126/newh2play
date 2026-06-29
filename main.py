@@ -1,67 +1,88 @@
-import sys
 import os
-import time
-import requests
-from playwright.sync_api import sync_playwright
-from browser import BrowserManager 
+import sys
+import tempfile
+from pathlib import Path
+from typing import Optional
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from dotenv import load_dotenv
+from patchright.sync_api import BrowserContext, Playwright
 
-def send_telegram(message, photo_path=None):
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID")
-    if not token or not chat_id: return
-    try:
-        requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={'chat_id': chat_id, 'text': message})
-        if photo_path and os.path.exists(photo_path):
-            with open(photo_path, 'rb') as f:
-                requests.post(f"https://api.telegram.org/bot{token}/sendPhoto", data={'chat_id': chat_id}, files={'photo': f})
-    except Exception as e:
-        print(f"Telegram 发送失败: {e}")
+from nopecha import verify_api_key
 
-def run_automation():
-    page = None
-    try:
-        with sync_playwright() as p:
-            with BrowserManager(p) as context:
-                page = context.new_page()
-                page.set_viewport_size({"width": 1920, "height": 1080})
-                
-                print("访问目标页面...")
-                page.goto("https://host2play.gratis/server/renew?i=0b2f82c5-df07-4457-a2d9-9d948ce3d12d")
-                
-                # --- 新增逻辑：立即截图 ---
-                print("进行初始页面状态截图...")
-                page.screenshot(path="initial_state.png", full_page=True)
-                send_telegram("页面已打开，当前初始状态：", "initial_state.png")
-                # -----------------------
-                
-                print("等待 renew 卡片显示...")
-                page.wait_for_selector("#renew", state="visible", timeout=45000)
-                
-                print("点击 Renew server...")
-                btn = page.get_by_role("button", name="Renew server")
-                btn.wait_for(state="visible")
-                btn.click()
-                
-                print("等待弹窗确认...")
-                page.wait_for_selector(".swal2-confirm", timeout=15000)
-                
-                confirm_btn = page.get_by_role("button", name="Renew")
-                confirm_btn.click(force=True)
-                
-                time.sleep(5)
-                page.screenshot(path="result.png", full_page=True)
-                send_telegram("Renew 操作成功完成！", "result.png")
-                
-    except Exception as e:
-        error_msg = f"Renew 任务执行失败: {str(e)}"
-        print(error_msg)
-        if page:
-            page.screenshot(path="error.png", full_page=True)
-            send_telegram(error_msg, "error.png")
-        else:
-            send_telegram(error_msg)
+load_dotenv()
 
-if __name__ == "__main__":
-    run_automation()
+BASE_DIR = Path(__file__).parent.absolute()
+NOPECHA_EXTENSION_PATH = BASE_DIR / "extensions" / "nopecha"
+CHROME_PROFILE_DIR = BASE_DIR / ".chrome_profile"
+
+class BrowserManager:
+    def __init__(self, playwright: Playwright):
+        self.playwright = playwright
+        self._display = None
+        self.context: Optional[BrowserContext] = None
+
+    def __enter__(self) -> BrowserContext:
+        # 这里改为 True，强制让它不要去启动 Xvfb，看是否能直接加载网页
+        # 在 GitHub Actions 中，这通常会让你看到一个空白报错，
+        # 但如果它加载出来了，说明问题就在 Xvfb 的分辨率或配置上
+        debug = True 
+        nopecha_enabled = os.getenv("NOPECHA_ENABLED", "true").lower() == "true"
+
+        if nopecha_enabled:
+            api_key = os.getenv("NOPECHA_API_KEY")
+            if not api_key:
+                raise EnvironmentError("NOPECHA_API_KEY is not set.")
+            verify_api_key(api_key)
+
+        if not debug:
+            from xvfbwrapper import Xvfb
+            self._display = Xvfb(width=1920, height=1080, colordepth=24)
+            self._display.start()
+            os.environ["DISPLAY"] = f":{self._display.new_display}"
+
+        CHROME_PROFILE_DIR.mkdir(exist_ok=True)
+
+        launch_args = [
+            "--no-sandbox",
+            "--disable-blink-features=AutomationControlled", # 核心：隐藏自动化特征
+        ]
+        if nopecha_enabled:
+            launch_args += [
+                f"--disable-extensions-except={NOPECHA_EXTENSION_PATH}",
+                f"--load-extension={NOPECHA_EXTENSION_PATH}",
+            ]
+
+        proxy_url = os.getenv("PROXY_SOCKS5")
+        proxy_config = {"server": proxy_url} if proxy_url else None
+
+        self.context = self.playwright.chromium.launch_persistent_context(
+            str(CHROME_PROFILE_DIR),
+            channel="chromium",
+            headless=False,
+            args=launch_args,
+            env={**os.environ},
+            proxy=proxy_config,
+        )
+
+        if nopecha_enabled:
+            self._inject_api_key(api_key)
+
+        return self.context
+
+    def __exit__(self, *_):
+        if self.context:
+            try: self.context.close()
+            except: pass
+        if self._display:
+            try: self._display.stop()
+            except: pass
+
+    def _inject_api_key(self, api_key: str) -> None:
+        page = self.context.new_page()
+        try:
+            page.goto(f"https://nopecha.com/setup#{api_key}", wait_until="load", timeout=10_000)
+            page.wait_for_timeout(1000)
+            if not page.get_by_text("Imported settings").is_visible():
+                raise RuntimeError("NopeCHA key injection failed.")
+        finally:
+            page.close()

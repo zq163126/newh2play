@@ -66,6 +66,10 @@ class BrowserManager:
             ]
 
         child_env = {**os.environ}
+        
+        # 获取代理配置
+        proxy_url = os.getenv("PROXY_SOCKS5")
+        proxy_config = {"server": proxy_url} if proxy_url else None
 
         self.context = self.playwright.chromium.launch_persistent_context(
             str(CHROME_PROFILE_DIR),
@@ -73,6 +77,7 @@ class BrowserManager:
             headless=False,
             args=launch_args,
             env=child_env,
+            proxy=proxy_config,
         )
 
         if nopecha_enabled:

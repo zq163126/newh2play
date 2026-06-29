@@ -22,39 +22,37 @@ def run_automation():
         with sync_playwright() as p:
             with BrowserManager(p) as context:
                 page = context.new_page()
+                # 设置网页视口大小
+                page.set_viewport_size({"width": 1920, "height": 1080})
                 
-                print("正在访问...")
+                print("访问目标页面...")
                 page.goto("https://host2play.gratis/server/renew?i=0b2f82c5-df07-4457-a2d9-9d948ce3d12d")
                 
-                # --- 核心改进：等待网络静止 + 缓冲时间 ---
-                print("等待页面完全加载...")
                 page.wait_for_load_state("networkidle")
-                time.sleep(8)  # 给它 8 秒钟时间把动态元素和广告彻底渲染出来
+                time.sleep(5) 
                 
-                # 现在截图，这时页面应该是完全体
-                page.screenshot(path="step1_fully_loaded.png")
-                send_telegram("页面已完全加载，当前状态：", "step1_fully_loaded.png")
-                # --------------------------------------
+                # 高清截图：full_page=True 截取全页面，quality=100 保证清晰度
+                page.screenshot(path="debug_full_hd.png", full_page=True, quality=100)
+                send_telegram("当前高清页面状态：", "debug_full_hd.png")
                 
-                print("准备点击 Renew server...")
+                # --- 原有点击逻辑 ---
+                print("点击 Renew server...")
                 btn = page.get_by_role("button", name="Renew server")
                 btn.wait_for(state="visible", timeout=30000)
                 btn.click()
                 
-                print("已点击，等待弹窗...")
+                print("等待弹窗...")
                 page.wait_for_selector(".swal2-confirm", timeout=30000)
-                page.screenshot(path="step2_popup.png")
-                send_telegram("点击成功，这是弹窗状态：", "step2_popup.png")
-                
                 page.get_by_role("button", name="Renew").click()
-                send_telegram("Renew 操作成功完成！")
+                
+                page.screenshot(path="result.png", full_page=True, quality=100)
+                send_telegram("Renew 操作成功完成！", "result.png")
                 
     except Exception as e:
-        error_msg = f"Renew 报错: {str(e)}"
+        error_msg = f"Renew 任务执行失败: {str(e)}"
         print(error_msg)
         if page:
-            # 出错时再截一次图，看看最后停在什么状态
-            page.screenshot(path="error.png")
+            page.screenshot(path="error.png", full_page=True, quality=100)
             send_telegram(error_msg, "error.png")
         else:
             send_telegram(error_msg)

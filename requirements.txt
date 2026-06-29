@@ -1,5 +1,6 @@
 playwright
 patchright
+playwright-stealth
 xvfbwrapper
 python-dotenv
 requests

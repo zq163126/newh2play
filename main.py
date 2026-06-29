@@ -28,8 +28,6 @@ def run_automation():
                 page.goto("https://host2play.gratis/server/renew?i=0b2f82c5-df07-4457-a2d9-9d948ce3d12d")
                 time.sleep(5)
 
-                # 1. 暴力清理阻碍元素（移植自成功的 DrissionPage 逻辑）
-                print("清理阻碍元素...")
                 page.evaluate("""() => {
                     const selectors = ['ins.adsbygoogle', 'iframe[src*="ads"]', '.modal-backdrop', '[id*="consent"]', '[class*="consent"]', '.loading-spinner'];
                     selectors.forEach(sel => {
@@ -37,31 +35,31 @@ def run_automation():
                     });
                 }""")
                 
-                print("等待 Renew 卡片显示...")
-                page.wait_for_selector("#renew", state="visible", timeout=30000)
-                
                 print("点击 Renew server...")
-                # 使用 force=True 确保点击不受遮罩影响
+                page.wait_for_selector("#renew", state="visible", timeout=30000)
                 page.get_by_role("button", name="Renew server").click(force=True)
                 
-                # 2. 验证码检测与激活逻辑
                 time.sleep(3)
-                # 使用 locator 查找 iframe 元素，它具有 count() 方法
-                captcha_frame = page.locator("iframe[src*='recaptcha/api2/bframe']")
-                
-                if captcha_frame.count() > 0:
+                if page.locator("iframe[src*='recaptcha/api2/bframe']").count() > 0:
                     print("检测到验证码，准备激活...")
                     try:
-                        # 尝试通过点击 anchor 触发验证码插件
                         page.locator("iframe[src*='recaptcha/api2/anchor']").content_frame.get_by_role("checkbox").click()
-                    except Exception as e:
-                        print(f"激活验证码失败: {e}")
+                    except: pass
                     
-                    print("等待 NopeCHA 处理 (40秒)...")
-                    time.sleep(40) 
+                    print("开始实时监控验证过程...")
+                    for i in range(9): # 总共 90 秒监控
+                        time.sleep(10)
+                        # 实时截屏并发送
+                        screenshot_name = f"monitor_{i}.png"
+                        page.screenshot(path=screenshot_name, full_page=True)
+                        send_telegram(f"验证码处理中... ({ (i+1)*10 }秒)", screenshot_name)
+                        
+                        # 检查验证码是否消失
+                        if page.locator("iframe[src*='recaptcha/api2/bframe']").count() == 0:
+                            print("✅ 验证码已通过！")
+                            break
                 
                 print("执行最终确认...")
-                # 尝试点击最终的 Renew 按钮
                 try:
                     page.get_by_role("button", name="Renew").click(force=True)
                 except Exception as e:

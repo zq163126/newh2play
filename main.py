@@ -4,7 +4,6 @@ import requests
 from playwright.sync_api import sync_playwright
 from browser import BrowserManager 
 
-# 确保能找到同目录文件
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 def send_telegram(message, photo_path=None):
@@ -22,34 +21,36 @@ def run_automation():
         with sync_playwright() as p:
             with BrowserManager(p) as context:
                 page = context.new_page()
-                print("正在访问目标页面...")
+                
+                print("正在访问...")
                 page.goto("https://host2play.gratis/server/renew?i=0b2f82c5-df07-4457-a2d9-9d948ce3d12d")
-                
-                # --- 截图排查遮挡 ---
                 page.wait_for_load_state("networkidle")
-                page.screenshot(path="debug_before_click.png")
-                print("已截图，请检查 Artifacts 中的 debug_before_click.png")
-                # ------------------
                 
-                # 继续执行你的原逻辑
-                print("点击 Renew server...")
+                # 步骤1：直接发送第一张截图
+                page.screenshot(path="step1_load.png")
+                send_telegram("页面已打开，当前状态：", "step1_load.png")
+                
+                # 步骤2：尝试点击
+                print("准备点击 Renew server...")
                 btn = page.get_by_role("button", name="Renew server")
                 btn.wait_for(state="visible", timeout=30000)
                 btn.click()
                 
-                print("等待弹窗...")
+                # 步骤3：等待弹窗并截图
+                print("已点击，等待弹窗...")
                 page.wait_for_selector(".swal2-confirm", timeout=30000)
-                page.get_by_role("button", name="Renew").click()
+                page.screenshot(path="step2_popup.png")
+                send_telegram("点击成功，弹窗已出现：", "step2_popup.png")
                 
-                page.screenshot(path="result.png")
-                send_telegram("Renew 操作成功！", "result.png")
+                page.get_by_role("button", name="Renew").click()
+                send_telegram("Renew 操作成功完成！")
                 
     except Exception as e:
-        error_msg = f"Renew 任务执行失败: {str(e)}"
+        error_msg = f"Renew 报错: {str(e)}"
         print(error_msg)
         if page:
-            page.screenshot(path="error_screenshot.png")
-            send_telegram(error_msg, "error_screenshot.png")
+            page.screenshot(path="error.png")
+            send_telegram(error_msg, "error.png")
         else:
             send_telegram(error_msg)
 

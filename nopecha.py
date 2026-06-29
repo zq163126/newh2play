@@ -14,7 +14,7 @@ involving the browser or extension at all.
 import httpx
 import logging
 
-from .config import HTTP_TIMEOUT_S
+from config import HTTP_TIMEOUT_S
 
 logger = logging.getLogger("mc.nopecha")
 

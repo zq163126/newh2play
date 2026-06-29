@@ -6,7 +6,7 @@ from typing import Optional
 from dotenv import load_dotenv
 from patchright.sync_api import BrowserContext, Playwright
 
-from .nopecha import verify_api_key
+from nopecha import verify_api_key
 
 load_dotenv()
 

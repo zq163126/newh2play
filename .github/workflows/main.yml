@@ -16,9 +16,24 @@ jobs:
         run: |
           pip install -r requirements.txt
           playwright install chromium
+      - name: Setup Gost Proxy
+        run: |
+          # 👇👇👇 正在启动gost代理 👇👇👇                
+          wget -q https://github.com/ginuerzh/gost/releases/download/v2.11.5/gost-linux-amd64-2.11.5.gz
+          gunzip -f gost-linux-amd64-2.11.5.gz
+          chmod +x gost-linux-amd64-2.11.5
+          
+          echo "🔗 启动 Gost 隧道: $SOCKS5_URL"
+          ./gost-linux-amd64-2.11.5 -L=http://:1080 -F="${{ secrets.SOCKS5_URL }}" > gost.log 2>&1 &
+          
+          sleep 5
+          echo "--- 🌐 连通性测试 ---"
+          curl -I -x http://127.0.0.1:1080 https://www.google.com
       - name: Run script
         env:
           NOPECHA_API_KEY: ${{ secrets.NOPECHA_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          HTTP_PROXY: http://127.0.0.1:1080
+          HTTPS_PROXY: http://127.0.0.1:1080
         run: python main.py

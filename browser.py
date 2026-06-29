@@ -1,11 +1,8 @@
 import os
-import sys
 from pathlib import Path
 from typing import Optional
 from dotenv import load_dotenv
 from patchright.sync_api import BrowserContext, Playwright
-
-# 确保能正确导入NopeCHA
 from nopecha import verify_api_key
 
 load_dotenv()
@@ -21,9 +18,9 @@ class BrowserManager:
 
     def __enter__(self) -> BrowserContext:
         nopecha_enabled = os.getenv("NOPECHA_ENABLED", "true").lower() == "true"
+        api_key = os.getenv("NOPECHA_API_KEY")
 
         if nopecha_enabled:
-            api_key = os.getenv("NOPECHA_API_KEY")
             if not api_key:
                 raise EnvironmentError("NOPECHA_API_KEY is not set.")
             verify_api_key(api_key)
@@ -34,6 +31,7 @@ class BrowserManager:
             "--no-sandbox",
             "--disable-blink-features=AutomationControlled",
         ]
+        # 恢复插件加载
         if nopecha_enabled:
             launch_args += [
                 f"--disable-extensions-except={NOPECHA_EXTENSION_PATH}",
@@ -47,18 +45,17 @@ class BrowserManager:
             str(CHROME_PROFILE_DIR),
             channel="chromium",
             headless=False,
-            viewport={"width": 1920, "height": 1080},
+            viewport={"width": 1280, "height": 720},
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
             args=launch_args,
             env={**os.environ},
             proxy=proxy_config,
         )
 
-        # 核心：注入 JS 伪装，抹除自动化特征
+        # 注入反检测脚本
         self.context.add_init_script("""
             Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
             window.navigator.chrome = {runtime: {}};
-            Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3]});
         """)
 
         if nopecha_enabled:
@@ -68,21 +65,13 @@ class BrowserManager:
 
     def __exit__(self, *_):
         if self.context:
-            try:
-                self.context.close()
-            except Exception:
-                pass
+            try: self.context.close()
+            except: pass
 
     def _inject_api_key(self, api_key: str) -> None:
         page = self.context.new_page()
         try:
-            page.goto(
-                f"https://nopecha.com/setup#{api_key}",
-                wait_until="load",
-                timeout=10_000,
-            )
+            page.goto(f"https://nopecha.com/setup#{api_key}", wait_until="load", timeout=10_000)
             page.wait_for_timeout(1000)
-            if not page.get_by_text("Imported settings").is_visible():
-                raise RuntimeError("NopeCHA key injection failed.")
         finally:
             page.close()

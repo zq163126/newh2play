@@ -1,72 +1,65 @@
 import sys
 import os
 import requests
-# 强制将当前脚本路径加入搜索路径，解决 ImportError 问题
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
+import time
 from playwright.sync_api import sync_playwright
-# 导入你原来的浏览器管理器
 from browser import BrowserManager 
 
+# 添加路径，确保能找到同目录文件
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 def send_telegram(message, photo_path=None):
-    """发送通知到 Telegram"""
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
-    if not token or not chat_id:
-        print("Telegram 环境变量缺失，无法发送通知")
-        return
-    
-    # 发送文本
-    requests.post(f"https://api.telegram.org/bot{token}/sendMessage", 
-                  data={'chat_id': chat_id, 'text': message})
-    
-    # 发送截图
+    if not token or not chat_id: return
+    requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={'chat_id': chat_id, 'text': message})
     if photo_path and os.path.exists(photo_path):
         with open(photo_path, 'rb') as f:
-            requests.post(f"https://api.telegram.org/bot{token}/sendPhoto", 
-                          data={'chat_id': chat_id}, files={'photo': f})
+            requests.post(f"https://api.telegram.org/bot{token}/sendPhoto", data={'chat_id': chat_id}, files={'photo': f})
 
 def run_automation():
     try:
         with sync_playwright() as p:
-            # 使用你原始的 browser.py 中的 BrowserManager
             with BrowserManager(p) as context:
                 page = context.new_page()
-                
-                # 去广告：拦截器
-                def block_ads(route):
-                    if any(ad in route.request.url for ad in ["doubleclick.net", "google-analytics.com", "adservice"]):
-                        route.abort()
-                    else:
-                        route.continue_()
-                page.route("**/*", block_ads)
                 
                 # 1. 访问目标
                 print("正在访问目标页面...")
                 page.goto("https://host2play.gratis/server/renew?i=0b2f82c5-df07-4457-a2d9-9d948ce3d12d")
                 
-                # 2. 点击 Renew server (鲁棒定位)
-                print("点击 Renew server...")
-                page.get_by_role("button", name="Renew server").click()
+                # --- 排查步骤：截图页面初始状态 ---
+                page.wait_for_load_state("networkidle") # 等待网络空闲
+                page.screenshot(path="debug_page_load.png")
+                print("已截取页面加载完成后的状态：debug_page_load.png")
+                # ------------------------------
+
+                # 2. 点击 Renew server
+                # 增加更长的等待时间，并尝试匹配更广泛的定位符
+                print("等待并点击 Renew server...")
+                # 尝试点击，如果 get_by_role 找不到，可以使用 CSS 选择器作为备份
+                btn = page.get_by_role("button", name="Renew server")
                 
-                # 3. 处理人机验证并确认
-                # 等待 swal2 弹窗出现
-                print("等待验证及确认弹窗...")
-                page.wait_for_selector(".swal2-confirm", timeout=60000)
+                # 确保按钮可见并可点击
+                btn.wait_for(state="visible", timeout=30000)
+                btn.click()
                 
-                # 点击弹窗里的确认 Renew 按钮
+                # 3. 处理弹窗
+                page.wait_for_selector(".swal2-confirm", timeout=30000)
                 page.get_by_role("button", name="Renew").click()
                 
-                # 4. 截图并通知
-                screenshot_path = "result.png"
-                page.screenshot(path=screenshot_path)
-                send_telegram("Renew 操作成功完成！", screenshot_path)
-                print("任务完成，已发送 Telegram 通知")
+                # 4. 成功截图
+                page.screenshot(path="result.png")
+                send_telegram("Renew 操作成功！", "result.png")
                 
     except Exception as e:
-        error_msg = f"Renew 任务执行失败: {str(e)}"
-        print(error_msg)
-        send_telegram(error_msg)
+        # --- 错误发生时立刻截图 ---
+        error_screenshot = "error_screenshot.png"
+        if 'page' in locals():
+            page.screenshot(path=error_screenshot)
+            send_telegram(f"Renew 失败，已截图: {str(e)}", error_screenshot)
+        else:
+            send_telegram(f"Renew 失败: {str(e)}")
+        print(f"任务执行失败: {str(e)}")
 
 if __name__ == "__main__":
     run_automation()

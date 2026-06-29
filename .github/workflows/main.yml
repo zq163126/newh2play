@@ -133,6 +133,4 @@ jobs:
           NOPECHA_API_KEY: ${{ secrets.NOPECHA_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          HTTP_PROXY: socks5://127.0.0.1:10808
-          HTTPS_PROXY: socks5://127.0.0.1:10808
         run: python main.py

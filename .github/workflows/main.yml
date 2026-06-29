@@ -14,11 +14,11 @@ jobs:
         
       - name: Install dependencies
         run: |
-          # 安装必要的 X11 和显示相关依赖库，防止浏览器启动失败
           sudo apt-get update
-          sudo apt-get install -y xvfb libx11-6 libxkbfile1 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2
+          # 注意这里将 libasound2 修改为了 libasound2t64
+          sudo apt-get install -y xvfb libx11-6 libxkbfile1 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2t64
           pip install -r requirements.txt
-          playwright install chromium
+          playwright install chromiumm
           
       - name: 安装并启动代理
         env:

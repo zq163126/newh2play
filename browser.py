@@ -75,7 +75,7 @@ class BrowserManager:
         finally:
             page.close()
 
-  def _check_nopecha_status(self) -> None:
+    def _check_nopecha_status(self) -> None:
         try:
             response = requests.get("https://api.nopecha.com/v1/status", proxies=proxies, timeout=5)
             if response.status_code == 200:

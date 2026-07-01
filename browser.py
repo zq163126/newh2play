@@ -4,6 +4,17 @@ from pathlib import Path
 from typing import Optional
 from dotenv import load_dotenv
 from patchright.sync_api import BrowserContext, Playwright
+PROXY_URL = os.getenv("PROXY_SOCKS5", "socks5://127.0.0.1:10808")
+
+# 2. 创建一个全局的 Session 对象
+session = requests.Session()
+
+# 3. 强制该 Session 永远使用代理
+# 这里通过 protocol 映射，让 http 和 https 都走这个代理
+session.proxies = {
+    "http": PROXY_URL,
+    "https": PROXY_URL
+}
 
 load_dotenv()
 

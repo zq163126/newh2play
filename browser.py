@@ -24,8 +24,8 @@ class BrowserManager:
         CHROME_PROFILE_DIR.mkdir(exist_ok=True)
         
         # 严格复刻：使用固定代理端口
-        proxy_url = "http://127.0.0.1:10808"
-        proxy_config = {"server": proxy_url}
+      #  proxy_url = "http://127.0.0.1:10808"
+      #  proxy_config = {"server": proxy_url}
 
         launch_args = [
             "--no-sandbox",

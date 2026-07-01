@@ -34,8 +34,8 @@ class BrowserManager:
                 f"--load-extension={NOPECHA_EXTENSION_PATH}",
             ]
 
-        # 代理固定指向 Sing-box 的 socks5 协议
-        proxy_url = "socks5://127.0.0.1:10808"
+        # 代理固定指向 10808 端口
+        proxy_url = "http://127.0.0.1:10808"
         proxy_config = {"server": proxy_url}
 
         self.context = self.playwright.chromium.launch_persistent_context(
@@ -43,7 +43,7 @@ class BrowserManager:
             channel="chromium",
             headless=False,
             viewport={"width": 1280, "height": 720},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/126.0.0.0",
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
             args=launch_args,
             env={**os.environ},
             proxy=proxy_config,

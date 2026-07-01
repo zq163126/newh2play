@@ -93,7 +93,8 @@ jobs:
           PYEOF
           
           # 3. 后台运行并等待握手
-          ./sing-box run -c config.json > proxy.log 2>&1 &
+          # 3. 后台运行并等待握手 (加入环境变量以兼容旧 DNS 配置)
+          ENABLE_DEPRECATED_LEGACY_DNS_SERVERS=true ./sing-box run -c config.json > proxy.log 2>&1 &
           echo "[INFO] 正在等待代理建立连接 (15秒)..."
           sleep 15
           

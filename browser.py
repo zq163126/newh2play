@@ -34,6 +34,10 @@ class BrowserManager:
                 f"--load-extension={NOPECHA_EXTENSION_PATH}",
             ]
 
+        # 代理固定指向 Sing-box 的 socks5 协议
+        proxy_url = "socks5://127.0.0.1:10808"
+        proxy_config = {"server": proxy_url}
+
         self.context = self.playwright.chromium.launch_persistent_context(
             str(CHROME_PROFILE_DIR),
             channel="chromium",
@@ -42,7 +46,7 @@ class BrowserManager:
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/126.0.0.0",
             args=launch_args,
             env={**os.environ},
-            proxy=None,
+            proxy=proxy_config,
         )
 
         self.context.add_init_script("""
@@ -52,7 +56,7 @@ class BrowserManager:
 
         if nopecha_enabled:
             self._inject_magic_config()
-            self._check_nopecha_status()
+            self._check_nopecha_status(proxy_url)
 
         return self.context
 
@@ -69,9 +73,10 @@ class BrowserManager:
         finally:
             page.close()
 
-    def _check_nopecha_status(self) -> None:
+    def _check_nopecha_status(self, proxy_url: str) -> None:
+        proxies = {"http": proxy_url, "https": proxy_url}
         try:
-            response = requests.get("https://api.nopecha.com/v1/status", timeout=5)
+            response = requests.get("https://api.nopecha.com/v1/status", proxies=proxies, timeout=5)
             if response.status_code == 200:
                 data = response.json()
                 print(f"--- NopeCHA 状态正常: 剩余额度={data.get('credit')} ---")

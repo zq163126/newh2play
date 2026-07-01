@@ -35,7 +35,7 @@ class BrowserManager:
             ]
 
         # 代理固定指向 10808 端口
-        proxy_url = os.getenv("PROXY_SOCKS5")
+        proxy_url = "http://127.0.0.1:10808"
         proxy_config = {"server": proxy_url}
 
         self.context = self.playwright.chromium.launch_persistent_context(

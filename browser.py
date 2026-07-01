@@ -10,8 +10,8 @@ BASE_DIR = Path(__file__).parent.absolute()
 NOPECHA_EXTENSION_PATH = BASE_DIR / "extensions" / "nopecha"
 CHROME_PROFILE_DIR = BASE_DIR / ".chrome_profile"
 
-# 你的 Magic URL
-MAGIC_URL = "https://nopecha.com/setup#_version=0|keys=|enabled=false|disabled_hosts=|input_method=auto|hook_method=auto|mouse_speed=medium|mouse_visualization=true|awscaptcha_auto_open=false|awscaptcha_auto_solve=false|awscaptcha_solve_delay_time=1000|awscaptcha_solve_delay=true|geetest_auto_open=false|geetest_auto_solve=false|geetest_solve_delay_time=1000|geetest_solve_delay=true|funcaptcha_auto_open=false|funcaptcha_auto_solve=false|funcaptcha_solve_delay_time=1000|funcaptcha_solve_delay=true|hcaptcha_auto_open=true|hcaptcha_auto_solve=true|hcaptcha_solve_delay_time=3000|hcaptcha_solve_delay=true|lemincaptcha_auto_open=false|lemincaptcha_auto_solve=false|lemincaptcha_solve_delay_time=1000|lemincaptcha_solve_delay=true|perimeterx_auto_solve=false|perimeterx_solve_delay_time=1000|perimeterx_solve_delay=true|recaptcha_auto_open=true|recaptcha_auto_solve=true|recaptcha_solve_delay_time=2000|recaptcha_solve_delay=true|textcaptcha_auto_solve=false|textcaptcha_image_selector=|textcaptcha_input_selector=|textcaptcha_math_expression=false|textcaptcha_solve_delay_time=100|textcaptcha_solve_delay=true|turnstile_auto_solve=true|turnstile_solve_delay_time=5000|turnstile_solve_delay=true"
+# 优化后的配置：增加延迟，让插件有足够时间完成服务器通信
+MAGIC_URL = "https://nopecha.com/setup#_version=0|keys=|enabled=true|recaptcha_auto_open=true|recaptcha_auto_solve=true|recaptcha_solve_delay_time=5000|hcaptcha_auto_open=true|hcaptcha_auto_solve=true|hcaptcha_solve_delay_time=5000|mouse_speed=slow"
 
 class BrowserManager:
     def __init__(self, playwright: Playwright):
@@ -19,48 +19,40 @@ class BrowserManager:
         self.context: Optional[BrowserContext] = None
 
     def __enter__(self) -> BrowserContext:
-        nopecha_enabled = os.getenv("NOPECHA_ENABLED", "true").lower() == "true"
         CHROME_PROFILE_DIR.mkdir(exist_ok=True)
-
+        proxy_url = "http://127.0.0.1:10808"
+        
         launch_args = [
             "--no-sandbox",
             "--disable-blink-features=AutomationControlled",
+            f"--load-extension={NOPECHA_EXTENSION_PATH}",
+            f"--disable-extensions-except={NOPECHA_EXTENSION_PATH}",
+            f"--proxy-server={proxy_url}"
         ]
-        if nopecha_enabled:
-            launch_args += [
-                f"--disable-extensions-except={NOPECHA_EXTENSION_PATH}",
-                f"--load-extension={NOPECHA_EXTENSION_PATH}",
-            ]
-
-        proxy_url = os.getenv("PROXY_SOCKS5")
-        proxy_config = {"server": proxy_url} if proxy_url else None
-
+        
         self.context = self.playwright.chromium.launch_persistent_context(
             str(CHROME_PROFILE_DIR),
             channel="chromium",
             headless=False,
             viewport={"width": 1280, "height": 720},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
             args=launch_args,
-            env={**os.environ},
-            proxy=proxy_config,
         )
 
-        # 【核心修正】恢复欺骗脚本，防止网站检测到自动化并禁用插件
+        # 注入防检测脚本
         self.context.add_init_script("""
             Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
             window.navigator.chrome = {runtime: {}};
         """)
 
-        if nopecha_enabled:
-            self._apply_magic_config()
-
+        # 注入配置
+        self._apply_magic_config()
+        
         return self.context
 
     def _apply_magic_config(self):
         page = self.context.new_page()
         try:
-            page.goto(MAGIC_URL, wait_until="load", timeout=15_000)
+            page.goto(MAGIC_URL, wait_until="load", timeout=20_000)
             page.wait_for_timeout(3000)
         finally:
             page.close()

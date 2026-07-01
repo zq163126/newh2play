@@ -54,7 +54,7 @@ class BrowserManager:
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
             args=launch_args,
             env={**os.environ},
-            proxy=proxy_config,
+           # proxy=proxy_config,
         )
 
         self.context.add_init_script("""

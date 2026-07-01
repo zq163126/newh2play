@@ -19,7 +19,7 @@ jobs:
           sudo apt-get install -y xvfb libx11-6 libxkbfile1 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2t64
           pip install -r requirements.txt
           playwright install chromium
-        #  pip install PySocks
+          pip install PySocks
           
       - name: 安装并启动代理 (全自动适配内核)
         env:

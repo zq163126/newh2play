@@ -19,7 +19,15 @@ jobs:
           sudo apt-get install -y xvfb libx11-6 libxkbfile1 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2t64
           pip install -r requirements.txt
           playwright install chromium
-          pip install PySocks
+          
+      - name: 安装并启动代理 (全自动适配内核)
+        env:
+          PROXY_NODE: ${{ secrets.PROXY_NODE }}
+        run: |
+          if [ -z "$PROXY_NODE" ]; then
+            echo "[INFO] 未配置代理，尝试直连模式..."
+            exit 0
+          fi
           
           # 1. 下载并安装最新的 Sing-box 核心
           TAG=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
@@ -126,13 +134,9 @@ jobs:
           fi
           
       - name: Run script
-            #  rm -rf .chrome_profile
         env:
           NOPECHA_API_KEY: ${{ secrets.NOPECHA_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      #    http_proxy: http://127.0.0.1:10808
-      #    https_proxy: http://127.0.0.1:10808
-      #    all_proxy: socks5://127.0.0.1:10808
-        # 使用 xvfb-run 启动，它会创建一个虚拟的显示环境，彻底解决 Missing X server 问题        
+        # 使用 xvfb-run 启动，它会创建一个虚拟的显示环境，彻底解决 Missing X server 问题
         run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python -u main.py

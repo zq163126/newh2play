@@ -58,7 +58,7 @@ class BrowserManager:
 
         if nopecha_enabled:
             self._inject_magic_config()
-            self._check_nopecha_status(proxy_url)
+            self._check_nopecha_status()
 
         return self.context
 
@@ -75,8 +75,7 @@ class BrowserManager:
         finally:
             page.close()
 
-    def _check_nopecha_status(self, proxy_url: str) -> None:
-        proxies = {"http": proxy_url, "https": proxy_url}
+  def _check_nopecha_status(self) -> None:
         try:
             response = requests.get("https://api.nopecha.com/v1/status", proxies=proxies, timeout=5)
             if response.status_code == 200:

@@ -27,8 +27,8 @@ class BrowserManager:
         launch_args = [
             "--no-sandbox",
             "--disable-blink-features=AutomationControlled",
-            "--disable-web-security", 
-            "--disable-features=IsolateOrigins,site-per-process",
+         #   "--disable-web-security", 
+         #   "--disable-features=IsolateOrigins,site-per-process",
         ]
         if nopecha_enabled:
             launch_args += [

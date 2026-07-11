@@ -81,7 +81,7 @@ class BrowserManager:
         page = self.context.new_page()
         try:
             page.goto(MAGIC_URL, wait_until="load", timeout=10_000)
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(5000)
         finally:
             page.close()
 

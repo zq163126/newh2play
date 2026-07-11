@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Optional
 from dotenv import load_dotenv
 from patchright.sync_api import BrowserContext, Playwright
+os.environ['https_proxy'] = 'socks5://127.0.0.1:10808'
+os.environ['http_proxy'] = 'socks5://127.0.0.1:10808'
 
 load_dotenv()
 

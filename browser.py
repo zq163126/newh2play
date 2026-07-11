@@ -12,9 +12,7 @@ os.environ["https_proxy"] = f"http://{proxy_url}"
 os.environ["all_proxy"] = f"socks5://{proxy_url}" 
 
 def get_proxy_settings():
-    return {
-        "server": f"http://{proxy_url}"
-    }
+    return {"server": f"http://{proxy_url}"}
 
 load_dotenv()
 
@@ -22,7 +20,7 @@ BASE_DIR = Path(__file__).parent.absolute()
 NOPECHA_EXTENSION_PATH = BASE_DIR / "extensions" / "nopecha"
 CHROME_PROFILE_DIR = BASE_DIR / ".chrome_profile"
 
-# 配置 NopeCHA 的 Magic URL (修正 enabled=true)
+# 配置 NopeCHA 的 Magic URL
 MAGIC_URL = "https://nopecha.com/setup#_version=0|keys=|enabled=true|disabled_hosts=|input_method=auto|hook_method=auto|mouse_speed=medium|mouse_visualization=true|awscaptcha_auto_open=false|awscaptcha_auto_solve=false|awscaptcha_solve_delay_time=1000|awscaptcha_solve_delay=true|geetest_auto_open=false|geetest_auto_solve=false|geetest_solve_delay_time=1000|geetest_solve_delay=true|funcaptcha_auto_open=false|funcaptcha_auto_solve=false|funcaptcha_solve_delay_time=1000|funcaptcha_solve_delay=true|hcaptcha_auto_open=true|hcaptcha_auto_solve=true|hcaptcha_solve_delay_time=3000|hcaptcha_solve_delay=true|lemincaptcha_auto_open=false|lemincaptcha_auto_solve=false|lemincaptcha_solve_delay_time=1000|lemincaptcha_solve_delay=true|perimeterx_auto_solve=false|perimeterx_solve_delay_time=1000|perimeterx_solve_delay=true|recaptcha_auto_open=true|recaptcha_auto_solve=true|recaptcha_solve_delay_time=2000|recaptcha_solve_delay=true|textcaptcha_auto_solve=false|textcaptcha_image_selector=|textcaptcha_input_selector=|textcaptcha_math_expression=false|textcaptcha_solve_delay_time=100|textcaptcha_solve_delay=true|turnstile_auto_solve=true|turnstile_solve_delay_time=5000|turnstile_solve_delay=true"
 
 class BrowserManager:
@@ -32,7 +30,6 @@ class BrowserManager:
 
     def __enter__(self) -> BrowserContext:
         nopecha_enabled = os.getenv("NOPECHA_ENABLED", "true").lower() == "true"
-
         CHROME_PROFILE_DIR.mkdir(exist_ok=True)
 
         launch_args = [
@@ -45,7 +42,6 @@ class BrowserManager:
                 f"--load-extension={NOPECHA_EXTENSION_PATH}",
             ]
 
-        # 代理配置
         proxy_config = {"server": f"http://{proxy_url}"}
 
         self.context = self.playwright.chromium.launch_persistent_context(
@@ -65,6 +61,8 @@ class BrowserManager:
         """)
 
         if nopecha_enabled:
+            # 等待插件后台加载完成
+            self.context.wait_for_event("backgroundpage")
             self._inject_magic_config()
             self._check_nopecha_status(f"http://{proxy_url}")
 
@@ -76,23 +74,29 @@ class BrowserManager:
             except: pass
 
     def _inject_magic_config(self) -> None:
+        # 优先尝试在 background_page 中注入，这里才有 chrome 对象权限
+        bg_pages = self.context.background_pages()
+        if bg_pages:
+            try:
+                bg_pages[0].evaluate("""
+                    () => {
+                        chrome.storage.local.set({
+                            "enabled": true,
+                            "auto_solve": true,
+                            "hcaptcha_auto_solve": true,
+                            "recaptcha_auto_solve": true,
+                            "turnstile_auto_solve": true
+                        }, () => { console.log("NopeCHA 强制激活完成"); });
+                    }
+                """)
+                print("DEBUG: 已通过后台页面激活 NopeCHA")
+            except Exception as e:
+                print(f"DEBUG: 后台注入失败，尝试备用方案: {e}")
+        
+        # 无论后台注入是否成功，都跳转一次 Magic URL 以触发插件内置的初始化逻辑
         page = self.context.new_page()
         try:
-            # 1. 尝试跳转 Magic URL
             page.goto(MAGIC_URL, wait_until="load", timeout=10_000)
-            
-            # 2. 强制执行注入，确保插件被激活
-            page.evaluate("""
-                () => {
-                    chrome.storage.local.set({
-                        "enabled": true,
-                        "auto_solve": true,
-                        "hcaptcha_auto_solve": true,
-                        "recaptcha_auto_solve": true,
-                        "turnstile_auto_solve": true
-                    }, () => { console.log("NopeCHA 强制激活完成"); });
-                }
-            """)
             page.wait_for_timeout(3000)
         finally:
             page.close()

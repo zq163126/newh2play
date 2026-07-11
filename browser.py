@@ -4,15 +4,18 @@ from pathlib import Path
 from typing import Optional
 from dotenv import load_dotenv
 from patchright.sync_api import BrowserContext, Playwright
-
-# 在程序启动时设置代理
+# os.environ['https_proxy'] = 'socks5://127.0.0.1:1080'
+# os.environ['http_proxy'] = 'socks5://127.0.0.1:1080'
+# 在程序启动时设置代理，仅在未设置环境变量时生效
 proxy_url = os.environ.get("PROXY", "127.0.0.1:1080")
 os.environ["http_proxy"] = f"http://{proxy_url}"
 os.environ["https_proxy"] = f"http://{proxy_url}"
-os.environ["all_proxy"] = f"socks5://{proxy_url}" 
-
+os.environ["all_proxy"] = f"socks5://{proxy_url}" # 兼容性补充
 def get_proxy_settings():
-    return {"server": f"http://{proxy_url}"}
+    """供不同库调用的统一配置字典"""
+    return {
+        "server": f"http://{proxy_url}"
+    }
 
 load_dotenv()
 
@@ -20,7 +23,7 @@ BASE_DIR = Path(__file__).parent.absolute()
 NOPECHA_EXTENSION_PATH = BASE_DIR / "extensions" / "nopecha"
 CHROME_PROFILE_DIR = BASE_DIR / ".chrome_profile"
 
-# 配置 NopeCHA 的 Magic URL
+# 配置 NopeCHA 的 Magic URL (已将 enabled=false 修改为 enabled=true)
 MAGIC_URL = "https://nopecha.com/setup#_version=0|keys=|enabled=true|disabled_hosts=|input_method=auto|hook_method=auto|mouse_speed=medium|mouse_visualization=true|awscaptcha_auto_open=false|awscaptcha_auto_solve=false|awscaptcha_solve_delay_time=1000|awscaptcha_solve_delay=true|geetest_auto_open=false|geetest_auto_solve=false|geetest_solve_delay_time=1000|geetest_solve_delay=true|funcaptcha_auto_open=false|funcaptcha_auto_solve=false|funcaptcha_solve_delay_time=1000|funcaptcha_solve_delay=true|hcaptcha_auto_open=true|hcaptcha_auto_solve=true|hcaptcha_solve_delay_time=3000|hcaptcha_solve_delay=true|lemincaptcha_auto_open=false|lemincaptcha_auto_solve=false|lemincaptcha_solve_delay_time=1000|lemincaptcha_solve_delay=true|perimeterx_auto_solve=false|perimeterx_solve_delay_time=1000|perimeterx_solve_delay=true|recaptcha_auto_open=true|recaptcha_auto_solve=true|recaptcha_solve_delay_time=2000|recaptcha_solve_delay=true|textcaptcha_auto_solve=false|textcaptcha_image_selector=|textcaptcha_input_selector=|textcaptcha_math_expression=false|textcaptcha_solve_delay_time=100|textcaptcha_solve_delay=true|turnstile_auto_solve=true|turnstile_solve_delay_time=5000|turnstile_solve_delay=true"
 
 class BrowserManager:
@@ -30,6 +33,7 @@ class BrowserManager:
 
     def __enter__(self) -> BrowserContext:
         nopecha_enabled = os.getenv("NOPECHA_ENABLED", "true").lower() == "true"
+
         CHROME_PROFILE_DIR.mkdir(exist_ok=True)
 
         launch_args = [
@@ -42,7 +46,9 @@ class BrowserManager:
                 f"--load-extension={NOPECHA_EXTENSION_PATH}",
             ]
 
-        proxy_config = {"server": f"http://{proxy_url}"}
+        # 代理固定指向 10808 端口
+        proxy_url = "http://127.0.0.1:1080"
+        proxy_config = {"server": proxy_url}
 
         self.context = self.playwright.chromium.launch_persistent_context(
             str(CHROME_PROFILE_DIR),
@@ -61,10 +67,8 @@ class BrowserManager:
         """)
 
         if nopecha_enabled:
-            # 等待插件后台加载完成
-            self.context.wait_for_event("backgroundpage")
             self._inject_magic_config()
-            self._check_nopecha_status(f"http://{proxy_url}")
+            self._check_nopecha_status(proxy_url)
 
         return self.context
 
@@ -74,30 +78,10 @@ class BrowserManager:
             except: pass
 
     def _inject_magic_config(self) -> None:
-        # 优先尝试在 background_page 中注入，这里才有 chrome 对象权限
-        bg_pages = self.context.background_pages()
-        if bg_pages:
-            try:
-                bg_pages[0].evaluate("""
-                    () => {
-                        chrome.storage.local.set({
-                            "enabled": true,
-                            "auto_solve": true,
-                            "hcaptcha_auto_solve": true,
-                            "recaptcha_auto_solve": true,
-                            "turnstile_auto_solve": true
-                        }, () => { console.log("NopeCHA 强制激活完成"); });
-                    }
-                """)
-                print("DEBUG: 已通过后台页面激活 NopeCHA")
-            except Exception as e:
-                print(f"DEBUG: 后台注入失败，尝试备用方案: {e}")
-        
-        # 无论后台注入是否成功，都跳转一次 Magic URL 以触发插件内置的初始化逻辑
         page = self.context.new_page()
         try:
             page.goto(MAGIC_URL, wait_until="load", timeout=10_000)
-            page.wait_for_timeout(3000)
+            page.wait_for_timeout(5000)
         finally:
             page.close()
 

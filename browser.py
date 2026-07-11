@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Optional
 from dotenv import load_dotenv
 from patchright.sync_api import BrowserContext, Playwright
-# os.environ['https_proxy'] = 'socks5://127.0.0.1:10808'
-# os.environ['http_proxy'] = 'socks5://127.0.0.1:10808'
+ os.environ['https_proxy'] = 'socks5://127.0.0.1:1080'
+ os.environ['http_proxy'] = 'socks5://127.0.0.1:1080'
 # 在程序启动时设置代理，仅在未设置环境变量时生效
 
 

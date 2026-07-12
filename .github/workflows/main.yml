@@ -1,9 +1,9 @@
 name: Renew Bot
 on:
   workflow_dispatch:      # 允许手动触发
-  schedule:
+ # schedule:
     # 每天北京时间早上 9 点和晚上 9 点各自动执行一次
-    - cron: '0 */6 * * *'
+ #   - cron: '0 */6 * * *'
 jobs:
   build:
     runs-on: ubuntu-latest
